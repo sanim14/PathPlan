@@ -119,12 +119,12 @@ export default function RouteBottomSheet() {
         style={{
           width: '100%',
           maxWidth: 480,
-          background: 'rgba(255,255,255,0.95)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          background: 'rgba(255,255,255,0.75)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
           borderRadius: '20px 20px 0 0',
           padding: '12px 20px 32px',
-          boxShadow: '0 -4px 24px rgba(0,0,0,0.1)',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.1)',
           transform: `translateY(${typeof translateY === 'number' ? `${translateY}px` : translateY})`,
           transition,
           userSelect: 'none',
@@ -225,14 +225,17 @@ export default function RouteBottomSheet() {
               style={{
                 width: '100%',
                 padding: '12px 0',
-                background: '#4F7CFF',
+                background: 'linear-gradient(135deg, #4F7CFF, #6EE7B7)',
                 color: '#fff',
                 border: 'none',
                 borderRadius: 12,
                 fontSize: 15,
                 fontWeight: 600,
                 cursor: 'pointer',
+                transition: 'transform 150ms ease',
               }}
+              onMouseDown={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.97)'; }}
+              onMouseUp={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
             >
               Add Shortcut
             </button>

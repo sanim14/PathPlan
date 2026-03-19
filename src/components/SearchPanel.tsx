@@ -3,6 +3,40 @@ import { useStore } from '../store/useStore';
 import { demoBuildings } from '../data/demo';
 import { Building } from '../types';
 
+function ExplanationPill() {
+  const activeRoute = useStore((s) => s.activeRoute);
+  if (!activeRoute?.explanation) return null;
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 148,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 95,
+        background: 'rgba(255,255,255,0.75)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid rgba(79,124,255,0.15)',
+        borderRadius: 999,
+        padding: '6px 16px',
+        fontSize: 12,
+        fontWeight: 500,
+        color: '#334155',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+        whiteSpace: 'nowrap',
+        maxWidth: 'min(90vw, 360px)',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        pointerEvents: 'none',
+        animation: 'fadeIn 300ms ease',
+      }}
+    >
+      ✨ {activeRoute.explanation}
+    </div>
+  );
+}
+
 const MAX_SUGGESTIONS = 5;
 
 interface FieldState {
@@ -122,15 +156,17 @@ export default function SearchPanel() {
   const toSuggestions = filterBuildings(to.value);
 
   return (
-    <div style={styles.panel}>
+    <>
+      <ExplanationPill />
+      <div style={styles.panel}>
       <style>{`
         .sp-input:focus {
           border-color: #4F7CFF !important;
           box-shadow: 0 0 0 3px rgba(79,124,255,0.15) !important;
         }
-        .sp-go-btn:hover {
-          background: #3a6ae8 !important;
-        }
+        .sp-go-btn:hover { opacity: 0.9; }
+        .sp-go-btn:active { transform: scale(0.97); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(-4px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
       `}</style>
       {/* From field */}
       <div ref={fromRef} style={styles.fieldWrapper}>
@@ -246,6 +282,7 @@ export default function SearchPanel() {
         Go
       </button>
     </div>
+    </>
   );
 }
 
@@ -257,12 +294,12 @@ const styles: Record<string, React.CSSProperties> = {
     transform: 'translateX(-50%)',
     zIndex: 100,
     width: 'min(90vw, 380px)',
-    background: 'rgba(255, 255, 255, 0.85)',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
+    background: 'rgba(255, 255, 255, 0.75)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
     border: '1px solid rgba(255,255,255,0.6)',
     borderRadius: '20px',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+    boxShadow: '0 8px 30px rgba(0,0,0,0.1)',
     padding: '16px',
     fontFamily: 'Inter, sans-serif',
     fontSize: '14px',
@@ -343,7 +380,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: '10px',
     width: '100%',
     padding: '10px',
-    background: '#4F7CFF',
+    background: 'linear-gradient(135deg, #4F7CFF, #6EE7B7)',
     color: 'white',
     border: 'none',
     borderRadius: '12px',
@@ -351,6 +388,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'Inter, sans-serif',
     fontWeight: 600,
     cursor: 'pointer',
-    transition: 'all 200ms ease',
+    transition: 'all 150ms ease',
   },
 };

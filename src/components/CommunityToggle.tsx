@@ -14,9 +14,9 @@ export default function CommunityToggle() {
         zIndex: 90,
         background: communityLayerEnabled
           ? '#6EE7B7'
-          : 'rgba(255,255,255,0.85)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+          : 'rgba(255,255,255,0.75)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         color: communityLayerEnabled ? '#065f46' : '#64748B',
         border: 'none',
         borderRadius: 999,

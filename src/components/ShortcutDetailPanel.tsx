@@ -53,12 +53,12 @@ export default function ShortcutDetailPanel() {
         style={{
           width: '100%',
           maxWidth: 480,
-          background: 'rgba(255,255,255,0.95)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          background: 'rgba(255,255,255,0.75)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
           borderRadius: '20px 20px 0 0',
           padding: '12px 20px 32px',
-          boxShadow: '0 -4px 24px rgba(0,0,0,0.1)',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.1)',
           transform: `translateY(${typeof translateY === 'number' ? `${translateY}px` : translateY})`,
           transition,
         }}

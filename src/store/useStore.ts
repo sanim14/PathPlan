@@ -5,6 +5,8 @@ import { computeRoute } from '../engine/router';
 import { generateExplanation } from '../engine/explanation';
 import { demoBuildings, demoShortcuts } from '../data/demo';
 
+interface LatLng { lat: number; lng: number }
+
 interface AppState {
   graph: Graph;
   shortcuts: Shortcut[];
@@ -19,6 +21,8 @@ interface AppState {
   activeShortcut: Shortcut | null;
   isAddingShortcut: boolean;
   routeFallback: 'accessibility' | 'safety' | null;
+  // Waypoints for map-driven shortcut drawing
+  waypoints: LatLng[];
 
   // Actions
   setConstraint: (constraint: Constraint, active: boolean) => void;
@@ -32,6 +36,9 @@ interface AppState {
   seedDemoData: () => void;
   setActiveShortcut: (shortcut: Shortcut | null) => void;
   setIsAddingShortcut: (value: boolean) => void;
+  addWaypoint: (latlng: LatLng) => void;
+  undoLastWaypoint: () => void;
+  clearWaypoints: () => void;
 }
 
 /** Find the first entrance node ID for a building */
@@ -69,6 +76,7 @@ export const useStore = create<AppState>((set, get) => ({
   activeShortcut: null,
   isAddingShortcut: false,
   routeFallback: null,
+  waypoints: [],
 
   setConstraint: (constraint, active) => {
     const { constraints, startLocation, endLocation, graph, timeBudget } = get();
@@ -167,5 +175,17 @@ export const useStore = create<AppState>((set, get) => ({
 
   setIsAddingShortcut: (value) => {
     set({ isAddingShortcut: value });
+  },
+
+  addWaypoint: (latlng) => {
+    set((state) => ({ waypoints: [...state.waypoints, latlng] }));
+  },
+
+  undoLastWaypoint: () => {
+    set((state) => ({ waypoints: state.waypoints.slice(0, -1) }));
+  },
+
+  clearWaypoints: () => {
+    set({ waypoints: [] });
   },
 }));
