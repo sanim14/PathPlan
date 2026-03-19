@@ -1,11 +1,11 @@
 import { Constraint, Graph, PathSegment, Route, RouterConfig, TimeBudget } from '../types';
 
-// Constraint weight presets
+// Exaggerated constraint presets for demo-visible route differences
 const CONSTRAINT_PRESETS: Record<Constraint, RouterConfig> = {
-  fastest:       { wDistance: 2.0, wCrowd: 0.5, wSafety: 0.5, wAccess: 0.5, wPop: 1.0 },
-  accessibility: { wDistance: 1.0, wCrowd: 0.5, wSafety: 1.0, wAccess: 3.0, wPop: 1.0 },
-  safety:        { wDistance: 1.0, wCrowd: 0.5, wSafety: 3.0, wAccess: 1.0, wPop: 1.0 },
-  'low-crowd':   { wDistance: 1.0, wCrowd: 3.0, wSafety: 1.0, wAccess: 1.0, wPop: 1.0 },
+  fastest:       { wDistance: 5.0, wCrowd: 0.2, wSafety: 0.2, wAccess: 0.2, wPop: 2.0 },
+  accessibility: { wDistance: 1.0, wCrowd: 0.5, wSafety: 1.0, wAccess: 8.0, wPop: 1.0 },
+  safety:        { wDistance: 0.5, wCrowd: 0.5, wSafety: 8.0, wAccess: 1.0, wPop: 1.0 },
+  'low-crowd':   { wDistance: 0.5, wCrowd: 8.0, wSafety: 1.0, wAccess: 1.0, wPop: 1.0 },
 };
 
 const DEFAULT_CONFIG: RouterConfig = {
@@ -17,30 +17,37 @@ const DEFAULT_CONFIG: RouterConfig = {
 };
 
 const TIME_BUDGET_WPOP: Record<TimeBudget, number> = {
-  5: 2.0,
+  5: 3.0,
   10: 1.0,
-  15: 0.5,
+  15: 0.3,
 };
 
 /**
  * Compute the edge cost for Dijkstra's algorithm.
- * Returns Infinity for segments that violate active constraints.
+ * Higher weights on crowd/safety/access push the router toward different paths.
  */
 export function edgeCost(seg: PathSegment, cfg: RouterConfig): number {
   const w = seg.weights;
+  // Base: distance cost
+  // Penalties: crowd level (higher = worse), unsafe (lower safetyScore = worse), inaccessible
+  // Bonus: popularity reduces cost slightly
+  const crowdPenalty = cfg.wCrowd * w.crowdLevel * seg.distance;
+  const safetyPenalty = cfg.wSafety * (1 - w.safetyScore) * seg.distance;
+  const accessPenalty = cfg.wAccess * (1 - w.accessibilityScore) * seg.distance;
+  const popularityBonus = cfg.wPop * Math.max(0, w.popularity) / 10;
+
   return (
     cfg.wDistance * seg.distance
-    + cfg.wCrowd   * w.crowdLevel
-    - cfg.wSafety  * w.safetyScore
-    - cfg.wAccess  * w.accessibilityScore
-    - cfg.wPop     * Math.max(0, w.popularity) / 10
+    + crowdPenalty
+    + safetyPenalty
+    + accessPenalty
+    - popularityBonus
   );
 }
 
 /**
  * Build a RouterConfig from active constraints and time budget.
  * Multiple constraints: average the weight presets.
- * Time budget overrides wPop after averaging.
  */
 export function getRouterConfig(constraints: Constraint[], timeBudget: TimeBudget): RouterConfig {
   let cfg: RouterConfig;
@@ -48,7 +55,6 @@ export function getRouterConfig(constraints: Constraint[], timeBudget: TimeBudge
   if (constraints.length === 0) {
     cfg = { ...DEFAULT_CONFIG };
   } else {
-    // Average the presets for all active constraints
     const keys: (keyof RouterConfig)[] = ['wDistance', 'wCrowd', 'wSafety', 'wAccess', 'wPop'];
     const sum = { wDistance: 0, wCrowd: 0, wSafety: 0, wAccess: 0, wPop: 0 };
     for (const constraint of constraints) {
@@ -66,20 +72,20 @@ export function getRouterConfig(constraints: Constraint[], timeBudget: TimeBudge
     };
   }
 
-  // Time budget adjusts wPop
   cfg.wPop = TIME_BUDGET_WPOP[timeBudget];
-
   return cfg;
 }
 
 /**
- * Returns true if the segment should be treated as infinite cost
- * given the active constraints.
+ * Returns true if the segment is hard-blocked by active constraints.
+ * Blocked segments get Infinity cost — router must find another path.
  */
 export function isSegmentBlocked(seg: PathSegment, constraints: Constraint[]): boolean {
+  // Accessibility: hard-block any segment with stairs
   if (constraints.includes('accessibility') && seg.tags.includes('stair')) {
     return true;
   }
+  // Safety: hard-block poorly-lit or isolated segments
   if (constraints.includes('safety') &&
       (seg.tags.includes('poorly-lit') || seg.tags.includes('isolated'))) {
     return true;
@@ -88,8 +94,7 @@ export function isSegmentBlocked(seg: PathSegment, constraints: Constraint[]): b
 }
 
 /**
- * Compute edge cost with constraint-based blocking.
- * Returns Infinity for blocked segments.
+ * Compute edge cost with constraint-based hard blocking.
  */
 export function edgeCostWithConstraints(
   seg: PathSegment,
@@ -102,9 +107,7 @@ export function edgeCostWithConstraints(
 
 /**
  * Dijkstra's algorithm over the graph.
- * Returns the best Route from startId to endId, or null if no path exists.
- * When two routes have equal total weight, prefers higher (safetyScore + popularity) tiebreak.
- * Falls back to unconstrained routing if accessibility/safety constraints yield no path.
+ * Falls back to unconstrained routing if hard constraints yield no path.
  */
 export function computeRoute(
   graph: Graph,
@@ -114,25 +117,18 @@ export function computeRoute(
   timeBudget: TimeBudget
 ): Route | null {
   const result = _dijkstra(graph, startId, endId, constraints, timeBudget);
-
   if (result !== null) return result;
 
-  // Fallback: if accessibility constraint blocked all paths, retry without it
+  // Fallback: drop accessibility constraint if it blocked all paths
   if (constraints.includes('accessibility')) {
-    const fallbackConstraints = constraints.filter((c) => c !== 'accessibility');
-    const fallback = _dijkstra(graph, startId, endId, fallbackConstraints, timeBudget);
-    if (fallback !== null) {
-      return { ...fallback, activeConstraints: constraints };
-    }
+    const fallback = _dijkstra(graph, startId, endId, constraints.filter((c) => c !== 'accessibility'), timeBudget);
+    if (fallback) return { ...fallback, activeConstraints: constraints };
   }
 
-  // Fallback: if safety constraint blocked all paths, retry without it
+  // Fallback: drop safety constraint if it blocked all paths
   if (constraints.includes('safety')) {
-    const fallbackConstraints = constraints.filter((c) => c !== 'safety');
-    const fallback = _dijkstra(graph, startId, endId, fallbackConstraints, timeBudget);
-    if (fallback !== null) {
-      return { ...fallback, activeConstraints: constraints };
-    }
+    const fallback = _dijkstra(graph, startId, endId, constraints.filter((c) => c !== 'safety'), timeBudget);
+    if (fallback) return { ...fallback, activeConstraints: constraints };
   }
 
   return null;
@@ -141,7 +137,7 @@ export function computeRoute(
 interface DijkstraNode {
   id: string;
   cost: number;
-  tiebreak: number; // higher is better (safetyScore + popularity)
+  tiebreak: number;
   prev: string | null;
   prevSeg: PathSegment | null;
 }
@@ -157,7 +153,6 @@ function _dijkstra(
 
   const cfg = getRouterConfig(constraints, timeBudget);
 
-  // dist[id] = { cost, tiebreak }
   const dist = new Map<string, { cost: number; tiebreak: number }>();
   const prev = new Map<string, { nodeId: string; seg: PathSegment } | null>();
 
@@ -167,7 +162,6 @@ function _dijkstra(
   }
   dist.set(startId, { cost: 0, tiebreak: 0 });
 
-  // Simple priority queue as sorted array (small graphs)
   const queue: DijkstraNode[] = [
     { id: startId, cost: 0, tiebreak: 0, prev: null, prevSeg: null },
   ];
@@ -175,10 +169,9 @@ function _dijkstra(
   const visited = new Set<string>();
 
   while (queue.length > 0) {
-    // Pop node with lowest cost (ties broken by higher tiebreak)
     queue.sort((a, b) => {
       if (a.cost !== b.cost) return a.cost - b.cost;
-      return b.tiebreak - a.tiebreak; // prefer higher tiebreak
+      return b.tiebreak - a.tiebreak;
     });
     const current = queue.shift()!;
 
@@ -191,15 +184,15 @@ function _dijkstra(
     for (const seg of neighbors) {
       if (visited.has(seg.to)) continue;
 
-      const edgeCostVal = edgeCostWithConstraints(seg, cfg, constraints);
-      if (edgeCostVal === Infinity) continue;
+      const cost = edgeCostWithConstraints(seg, cfg, constraints);
+      if (cost === Infinity) continue;
 
-      const newCost = current.cost + edgeCostVal;
+      const newCost = current.cost + cost;
       const segTiebreak = seg.weights.safetyScore + Math.max(0, seg.weights.popularity);
       const newTiebreak = current.tiebreak + segTiebreak;
 
       const existing = dist.get(seg.to);
-      if (existing === undefined) continue; // node not in graph
+      if (existing === undefined) continue;
 
       const isBetter =
         newCost < existing.cost ||
@@ -213,11 +206,9 @@ function _dijkstra(
     }
   }
 
-  // No path found
   const endDist = dist.get(endId);
   if (!endDist || endDist.cost === Infinity) return null;
 
-  // Reconstruct path
   const segments: PathSegment[] = [];
   let cursor: string | null = endId;
   while (cursor !== null && cursor !== startId) {

@@ -23,6 +23,8 @@ interface AppState {
   routeFallback: 'accessibility' | 'safety' | null;
   // Waypoints for map-driven shortcut drawing
   waypoints: LatLng[];
+  // Pinned shortcut — forces router to prefer this shortcut's path
+  pinnedShortcutId: string | null;
 
   // Actions
   setConstraint: (constraint: Constraint, active: boolean) => void;
@@ -39,6 +41,7 @@ interface AppState {
   addWaypoint: (latlng: LatLng) => void;
   undoLastWaypoint: () => void;
   clearWaypoints: () => void;
+  setPinnedShortcut: (id: string | null) => void;
 }
 
 /** Find the first entrance node ID for a building */
@@ -77,6 +80,7 @@ export const useStore = create<AppState>((set, get) => ({
   isAddingShortcut: false,
   routeFallback: null,
   waypoints: [],
+  pinnedShortcutId: null,
 
   setConstraint: (constraint, active) => {
     const { constraints, startLocation, endLocation, graph, timeBudget } = get();
@@ -187,5 +191,32 @@ export const useStore = create<AppState>((set, get) => ({
 
   clearWaypoints: () => {
     set({ waypoints: [] });
+  },
+
+  setPinnedShortcut: (id) => {
+    const { startLocation, endLocation, graph, constraints, timeBudget, shortcuts } = get();
+    set({ pinnedShortcutId: id });
+
+    if (!startLocation || !endLocation) return;
+
+    // Boost the pinned shortcut's popularity so Dijkstra strongly prefers it
+    let workingGraph = graph;
+    if (id) {
+      const pinned = shortcuts.find((s) => s.id === id);
+      if (pinned) {
+        const boosted: Shortcut = { ...pinned, popularityScore: 200 };
+        workingGraph = addShortcutEdge(graph, boosted);
+      }
+    }
+
+    const startId = workingGraph.nodes.has(startLocation.entrances[0].id)
+      ? startLocation.entrances[0].id
+      : startLocation.entrances[0].id;
+    const endId = endLocation.entrances[0].id;
+    const route = computeRoute(workingGraph, startId, endId, constraints, timeBudget);
+    if (route) {
+      route.explanation = generateExplanation(route);
+      set({ activeRoute: route });
+    }
   },
 }));

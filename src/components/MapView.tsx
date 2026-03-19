@@ -7,6 +7,7 @@ import { Shortcut } from '../types';
 
 const COMMUNITY_SOURCE_ID = 'community-shortcuts';
 const COMMUNITY_LAYER_ID = 'community-shortcuts-line';
+const COMMUNITY_HIGHLIGHT_LAYER_ID = 'community-shortcuts-highlight';
 const SAFETY_SOURCE_ID = 'unsafe-segments';
 const SAFETY_LAYER_ID = 'unsafe-segments-line';
 const COMMUNITY_COLOR = '#6EE7B7';
@@ -70,6 +71,7 @@ export default function MapView({ onShortcutClick }: MapViewProps) {
   const isAddingShortcut = useStore((s) => s.isAddingShortcut);
   const waypoints = useStore((s) => s.waypoints);
   const addWaypoint = useStore((s) => s.addWaypoint);
+  const activeShortcut = useStore((s) => s.activeShortcut);
   const token = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
 
   // Initialize map once on mount
@@ -321,6 +323,7 @@ export default function MapView({ onShortcutClick }: MapViewProps) {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
+    if (map.getLayer(COMMUNITY_HIGHLIGHT_LAYER_ID)) map.removeLayer(COMMUNITY_HIGHLIGHT_LAYER_ID);
     if (map.getLayer(COMMUNITY_LAYER_ID)) map.removeLayer(COMMUNITY_LAYER_ID);
     if (map.getSource(COMMUNITY_SOURCE_ID)) map.removeSource(COMMUNITY_SOURCE_ID);
     topShortcutMarkerRef.current?.remove();
@@ -333,7 +336,11 @@ export default function MapView({ onShortcutClick }: MapViewProps) {
 
     const features = shortcuts.map((shortcut) => ({
       type: 'Feature' as const,
-      properties: { id: shortcut.id, isTop: shortcut.id === topShortcut.id },
+      properties: {
+        id: shortcut.id,
+        isTop: shortcut.id === topShortcut.id,
+        isSelected: shortcut.id === activeShortcut?.id,
+      },
       geometry: {
         type: 'LineString' as const,
         coordinates: shortcut.coordinates.map((c) => [c.lng, c.lat] as [number, number]),
@@ -341,16 +348,46 @@ export default function MapView({ onShortcutClick }: MapViewProps) {
     }));
 
     map.addSource(COMMUNITY_SOURCE_ID, { type: 'geojson', data: { type: 'FeatureCollection', features } });
+
+    // Glow layer for selected shortcut
+    map.addLayer({
+      id: COMMUNITY_HIGHLIGHT_LAYER_ID,
+      type: 'line',
+      source: COMMUNITY_SOURCE_ID,
+      filter: ['==', ['get', 'isSelected'], true],
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#F59E0B',
+        'line-width': 14,
+        'line-blur': 10,
+        'line-opacity': 0.5,
+      },
+    });
+
     map.addLayer({
       id: COMMUNITY_LAYER_ID,
       type: 'line',
       source: COMMUNITY_SOURCE_ID,
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
-        'line-color': ['case', ['==', ['get', 'isTop'], true], TOP_SHORTCUT_COLOR, COMMUNITY_COLOR],
-        'line-width': ['case', ['==', ['get', 'isTop'], true], 4, 3],
+        'line-color': [
+          'case',
+          ['==', ['get', 'isSelected'], true], '#F59E0B',
+          ['==', ['get', 'isTop'], true], TOP_SHORTCUT_COLOR,
+          COMMUNITY_COLOR,
+        ],
+        'line-width': [
+          'case',
+          ['==', ['get', 'isSelected'], true], 6,
+          ['==', ['get', 'isTop'], true], 4,
+          3,
+        ],
         'line-dasharray': [2, 2],
-        'line-opacity': 1,
+        'line-opacity': [
+          'case',
+          ['==', ['get', 'isSelected'], true], 1.0,
+          0.85,
+        ],
       },
     });
 
@@ -377,7 +414,7 @@ export default function MapView({ onShortcutClick }: MapViewProps) {
       .setLngLat([midLng, midLat]).addTo(map);
 
     return () => { map.off('click', COMMUNITY_LAYER_ID, clickHandler); };
-  }, [communityLayerEnabled, shortcuts]);
+  }, [communityLayerEnabled, shortcuts, activeShortcut]);
 
   // Accessibility markers
   useEffect(() => {

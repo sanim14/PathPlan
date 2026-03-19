@@ -19,8 +19,16 @@ function entranceTagsToSegmentTags(
   entranceTags: ('accessible' | 'main' | 'stair-free')[]
 ): SegmentTag[] {
   const result: SegmentTag[] = [];
-  if (entranceTags.includes('main')) result.push('main-walkway');
-  if (entranceTags.includes('accessible') || entranceTags.includes('stair-free')) result.push('ramp');
+  if (entranceTags.includes('main')) {
+    result.push('main-walkway', 'well-lit');
+  }
+  if (entranceTags.includes('accessible') || entranceTags.includes('stair-free')) {
+    result.push('ramp');
+  }
+  // Entrances without stair-free or accessible tags imply stairs
+  if (!entranceTags.includes('accessible') && !entranceTags.includes('stair-free') && !entranceTags.includes('main')) {
+    result.push('stair');
+  }
   return result;
 }
 
@@ -47,14 +55,28 @@ function shortcutTagsToSegmentTags(
 }
 
 // Derive SegmentWeights from tags and optional shortcut popularity
+// Values are exaggerated for demo-visible routing differences
 function weightsFromTags(tags: SegmentTag[], popularity = 0): SegmentWeights {
-  const crowdLevel = tags.includes('crowded') ? 0.8 : 0.3;
+  // Crowd: crowded paths are heavily penalized under low-crowd mode
+  const crowdLevel = tags.includes('crowded') ? 0.9
+    : tags.includes('main-walkway') ? 0.6
+    : 0.2;
+
+  // Safety: unsafe paths are heavily penalized under safety mode
   const safetyScore =
-    tags.includes('poorly-lit') || tags.includes('isolated') ? 0.3 : 0.8;
+    tags.includes('poorly-lit') || tags.includes('isolated') ? 0.1
+    : tags.includes('well-lit') || tags.includes('main-walkway') ? 1.0
+    : 0.7;
+
+  // Accessibility: stairs are hard-blocked; ramps/elevators are preferred
   const accessibilityScore =
-    tags.includes('stair') ? 0.1 : tags.includes('ramp') || tags.includes('elevator') ? 1.0 : 0.7;
+    tags.includes('stair') ? 0.0
+    : tags.includes('ramp') || tags.includes('elevator') ? 1.0
+    : tags.includes('indoor') ? 0.9
+    : 0.6;
+
   return {
-    distance: 0, // will be set to actual distance after creation
+    distance: 0, // set to actual distance after creation
     crowdLevel,
     safetyScore,
     accessibilityScore,
