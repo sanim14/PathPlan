@@ -5,11 +5,26 @@ A community-powered campus navigation web app that provides optimized walking ro
 ## What it does
 
 - Smart routing with Dijkstra's algorithm, weighted by distance, safety, crowd level, accessibility, and shortcut popularity
-- Community-submitted shortcuts that feed directly into the routing graph
-- Constraint toggles: Fastest, No Stairs (accessibility), Night Safe, Low Crowd
-- Time budget selector (5 / 10 / 15 min) that adjusts route aggressiveness
-- Community layer showing all student-submitted shortcuts with upvote/downvote voting
-- Animated route drawing, draggable bottom sheet, glassmorphism UI
+- Constraint toggles visibly change the route on the map — each toggle uses exaggerated weights so the path difference is immediately obvious
+- Community-submitted shortcuts feed directly into the routing graph
+- Tap a shortcut on the map to see a human-readable explanation, votes, and optionally force the router to use it
+- "Use this shortcut" button pins a shortcut into the route — router strongly prefers it via popularity boost
+- Map-driven shortcut drawing: tap the map to place numbered waypoints, preview the path live, then submit
+- Time budget selector (5 / 10 / 15 min) adjusts route aggressiveness
+- Animated route drawing with glow effect, color-coded by active constraint
+- Floating explanation pill below the search panel summarizes the active route
+- Draggable bottom sheet, glassmorphism panels, gradient buttons, micro-interactions throughout
+
+## Constraint behavior
+
+| Toggle | Effect |
+|---|---|
+| Fastest | Heavily prioritizes distance, ignores crowd/safety |
+| No Stairs | Hard-blocks stair segments, prefers ramps |
+| Night Safe | Hard-blocks poorly-lit and isolated segments |
+| Low Crowd | Heavily penalizes crowded segments |
+
+Route line color changes with the active constraint: blue (fastest), green (night safe), purple (low crowd).
 
 ## Tech stack
 
@@ -17,8 +32,7 @@ A community-powered campus navigation web app that provides optimized walking ro
 - Mapbox GL JS
 - Zustand (state management)
 - Firebase Firestore (shortcut persistence)
-- fast-check (property-based tests)
-- Vitest
+- Vitest + fast-check (property-based tests)
 
 ## Getting started
 
@@ -42,7 +56,7 @@ VITE_MAPBOX_TOKEN=your_token_here
 
 Get a free token at [account.mapbox.com](https://account.mapbox.com/access-tokens/).
 
-4. (Optional) Add Firebase config to `.env.local` if you want shortcut persistence. The app works fully without it using local state.
+4. (Optional) Add Firebase config to `.env.local` for shortcut persistence. The app works fully without it using local state.
 
 5. Start the dev server:
 
@@ -54,15 +68,17 @@ Open `http://localhost:5173`.
 
 ## Demo flow
 
-1. App loads instantly with 12 campus buildings and 12 preloaded shortcuts
-2. Type "Library" in the From field → select Perry-Castañeda Library
-3. Type "Engineering" in the To field → select Engineering Building
-4. Route animates onto the map, bottom sheet slides up with time estimate
-5. Toggle "No Stairs" → route updates avoiding stair segments
-6. Toggle "Night Safe" → route updates avoiding poorly-lit paths
-7. Tap "🗺️ Shortcuts" → community shortcuts appear as dashed overlays
-8. Tap a shortcut → detail panel shows tags, votes, popularity score
-9. Tap "Add Shortcut" → draw waypoints, tag it, submit
+1. App loads with 12 campus buildings and 12 preloaded shortcuts
+2. Type "Library" → From: Perry-Castañeda Library
+3. Type "Engineering" → To: Engineering Building
+4. Route animates onto the map with time estimate and explanation pill
+5. Toggle "No Stairs" → route visibly changes, avoids stair segments
+6. Toggle "Night Safe" → route changes again, avoids poorly-lit paths
+7. Toggle "Low Crowd" → route shifts to less-crowded segments
+8. Tap "🗺️ Shortcuts" → community shortcuts appear as dashed overlays
+9. Tap a shortcut → detail panel shows explanation, tags, votes
+10. Tap "Use this shortcut" → router recomputes to include it
+11. Tap "Add Shortcut" → tap the map to place waypoints, tag it, submit
 
 ## Project structure
 
